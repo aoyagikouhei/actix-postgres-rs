@@ -5,6 +5,7 @@ use bb8_postgres::{
     tokio_postgres::{
         config::Config,
         error::Error,
+        row::Row,
         Socket,
         tls::{
             MakeTlsConnect,
@@ -83,15 +84,21 @@ where
     }
 }
 
+#[derive(Debug)]
+pub enum PgActorError {
+    PGError(Error),
+    ConnectionNone,
+}
+
 #[derive(Message)]
-#[rtype(result = "()")]
+#[rtype(result = "Result<PostgresResultType, PgActorError>")]
 pub struct PostgresTask<F,Tls>
 where
     Tls: MakeTlsConnect<Socket> + Clone + Send + Sync + 'static + Unpin,
     <Tls as MakeTlsConnect<Socket>>::Stream: Send + Sync,
     <Tls as MakeTlsConnect<Socket>>::TlsConnect: Send,
     <<Tls as MakeTlsConnect<Socket>>::TlsConnect as TlsConnect<Socket>>::Future: Send + Unpin,
-    F: FnOnce(Pool<PostgresConnectionManager<Tls>>) -> ResponseFuture<()> + 'static,
+    F: FnOnce(Pool<PostgresConnectionManager<Tls>>) -> ResponseFuture<Result<PostgresResultType, PgActorError>> + 'static,
 {
     query: F,
     phantom: PhantomData<Tls>,
@@ -103,7 +110,7 @@ where
     <Tls as MakeTlsConnect<Socket>>::Stream: Send + Sync,
     <Tls as MakeTlsConnect<Socket>>::TlsConnect: Send,
     <<Tls as MakeTlsConnect<Socket>>::TlsConnect as TlsConnect<Socket>>::Future: Send + Unpin,
-    F: FnOnce(Pool<PostgresConnectionManager<Tls>>) -> ResponseFuture<()> + 'static + Send + Sync,
+    F: FnOnce(Pool<PostgresConnectionManager<Tls>>) -> ResponseFuture<Result<PostgresResultType, PgActorError>> + 'static + Send + Sync,
 {
     pub fn new(query: F) -> Self {
         PostgresTask {
@@ -120,18 +127,32 @@ where
     <Tls as MakeTlsConnect<Socket>>::Stream: Send + Sync,
     <Tls as MakeTlsConnect<Socket>>::TlsConnect: Send,
     <<Tls as MakeTlsConnect<Socket>>::TlsConnect as TlsConnect<Socket>>::Future: Send + Unpin,
-    F: FnOnce(Pool<PostgresConnectionManager<Tls>>) -> ResponseFuture<()> + 'static + Send + Sync,
+    F: FnOnce(Pool<PostgresConnectionManager<Tls>>) -> ResponseFuture<Result<PostgresResultType, PgActorError>> + 'static + Send + Sync,
 {
-    type Result = ();
+    type Result = ResponseFuture<Result<PostgresResultType, PgActorError>>;
 
-    fn handle(&mut self, msg: PostgresTask<F, Tls>, ctx: &mut Self::Context)
+    fn handle(&mut self, msg: PostgresTask<F, Tls>, _ctx: &mut Self::Context) -> Self::Result
     {
-        if let Some(ref mut pool) = self.pool {
+        if let Some(pool) = &self.pool {
             let pool2 = pool.clone();
-            async move {
+            Box::pin(async move {
                 (msg.query)(pool2).await
-            }.into_actor(self)
-            .wait(ctx);
+            })
+        } else {
+            Box::pin(async{Err(PgActorError::ConnectionNone)})
+        }
+    }
+}
+
+pub enum PostgresResultType {
+    Query(Vec<Row>)
+}
+
+impl PostgresResultType {
+    pub fn query(res: Result<Vec<Row>, Error>) -> Result<Self, PgActorError> {
+        match res {
+            Ok(res) => Ok(PostgresResultType::Query(res)),
+            Err(err) => Err(PgActorError::PGError(err)),
         }
     }
 }

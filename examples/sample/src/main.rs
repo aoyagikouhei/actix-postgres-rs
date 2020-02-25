@@ -7,6 +7,7 @@ use actix_postgres::{
     bb8_postgres::tokio_postgres::tls::NoTls,
     PostgresActor,
     PostgresTask,
+    PostgresResultType,
 };
 
 struct MyActor { msg: String, seconds: u64, pg: Addr<PostgresActor<NoTls>> }
@@ -18,17 +19,27 @@ impl Actor for MyActor {
 impl Handler<Task> for MyActor {
     type Result = u64;
 
-    fn handle(&mut self, _msg: Task, _ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, _msg: Task, ctx: &mut Self::Context) -> Self::Result {
         println!("{}", self.msg);
-        let msg2 = self.msg.clone();
         let task = PostgresTask::new(
             |pool| Box::pin(async move {
                 let connection = pool.get().await.unwrap();
-                let res = connection.query("SELECT NOW()::TEXT as c", &vec![]).await.unwrap();
-                let val: &str = res[0].get(0);
-                println!("{},{}", msg2, val);
+                let res = connection.query("SELECT NOW()::TEXT as c", &vec![]).await;
+                PostgresResultType::query(res)
             }));
-        self.pg.do_send(task);
+        let msg2 = self.msg.clone();
+        self.pg.send(task).into_actor(self).map(move |res, _act, _ctx| match res {
+            Ok(res) =>  match res {
+                Ok(res) => match res {
+                    PostgresResultType::Query(res) => {
+                        let val: &str = res[0].get(0);
+                        println!("{},{}", msg2, val);
+                    }
+                },
+                Err(err) => println!("{:?}", err),
+            },
+            Err(err) => println!("{:?}", err),
+        }).wait(ctx);
         self.seconds
     }
 }
