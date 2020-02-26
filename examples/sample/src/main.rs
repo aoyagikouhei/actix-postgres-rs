@@ -6,8 +6,7 @@ use actix_daemon_utils::{
 use actix_postgres::{
     bb8_postgres::tokio_postgres::tls::NoTls,
     PostgresActor,
-    PostgresTask,
-    PostgresResultType,
+    QueryTask,
 };
 
 struct MyActor { msg: String, seconds: u64, pg: Addr<PostgresActor<NoTls>> }
@@ -21,20 +20,17 @@ impl Handler<Task> for MyActor {
 
     fn handle(&mut self, _msg: Task, ctx: &mut Self::Context) -> Self::Result {
         println!("{}", self.msg);
-        let task = PostgresTask::new(
+        let task = QueryTask::new(
             |pool| Box::pin(async move {
                 let connection = pool.get().await.unwrap();
-                let res = connection.query("SELECT NOW()::TEXT as c", &vec![]).await;
-                PostgresResultType::query(res)
+                connection.query("SELECT NOW()::TEXT as c", &vec![]).await
             }));
         let msg2 = self.msg.clone();
         self.pg.send(task).into_actor(self).map(move |res, _act, _ctx| match res {
             Ok(res) =>  match res {
-                Ok(res) => match res {
-                    PostgresResultType::Query(res) => {
-                        let val: &str = res[0].get(0);
-                        println!("{},{}", msg2, val);
-                    }
+                Ok(res) => {
+                    let val: &str = res[0].get(0);
+                    println!("{},{}", msg2, val);
                 },
                 Err(err) => println!("{:?}", err),
             },
