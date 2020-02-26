@@ -5,7 +5,6 @@ use bb8_postgres::{
     tokio_postgres::{
         config::Config,
         error::Error,
-        row::Row,
         Socket,
         tls::{
             MakeTlsConnect,
@@ -84,27 +83,37 @@ where
     }
 }
 
-#[derive(Message)]
-#[rtype(result = "Result<Vec<Row>, Error>")]
-pub struct QueryTask<F,Tls>
+pub struct PostgresMessage<F,Tls,R>
 where
     Tls: MakeTlsConnect<Socket> + Clone + Send + Sync + 'static + Unpin,
     <Tls as MakeTlsConnect<Socket>>::Stream: Send + Sync,
     <Tls as MakeTlsConnect<Socket>>::TlsConnect: Send,
     <<Tls as MakeTlsConnect<Socket>>::TlsConnect as TlsConnect<Socket>>::Future: Send + Unpin,
-    F: FnOnce(Pool<PostgresConnectionManager<Tls>>) -> ResponseFuture<Result<Vec<Row>, Error>> + 'static,
+    F: FnOnce(Pool<PostgresConnectionManager<Tls>>) -> ResponseFuture<Result<R, Error>> + 'static,
 {
     query: F,
     phantom: PhantomData<Tls>,
 }
 
-impl<F, Tls> QueryTask<F, Tls>
+impl<F,Tls,R> Message for PostgresMessage<F,Tls,R>
+where
+    R: 'static,
+    Tls: MakeTlsConnect<Socket> + Clone + Send + Sync + 'static + Unpin,
+    <Tls as MakeTlsConnect<Socket>>::Stream: Send + Sync,
+    <Tls as MakeTlsConnect<Socket>>::TlsConnect: Send,
+    <<Tls as MakeTlsConnect<Socket>>::TlsConnect as TlsConnect<Socket>>::Future: Send + Unpin,
+    F: FnOnce(Pool<PostgresConnectionManager<Tls>>) -> ResponseFuture<Result<R, Error>> + 'static + Send + Sync,
+{
+    type Result = Result<R, Error>;
+}
+
+impl<F, Tls, R> PostgresMessage<F, Tls, R>
 where
     Tls: MakeTlsConnect<Socket> + Clone + Send + Sync + 'static + Unpin,
     <Tls as MakeTlsConnect<Socket>>::Stream: Send + Sync,
     <Tls as MakeTlsConnect<Socket>>::TlsConnect: Send,
     <<Tls as MakeTlsConnect<Socket>>::TlsConnect as TlsConnect<Socket>>::Future: Send + Unpin,
-    F: FnOnce(Pool<PostgresConnectionManager<Tls>>) -> ResponseFuture<Result<Vec<Row>, Error>> + 'static + Send + Sync,
+    F: FnOnce(Pool<PostgresConnectionManager<Tls>>) -> ResponseFuture<Result<R, Error>> + 'static + Send + Sync,
 {
     pub fn new(query: F) -> Self {
         Self {
@@ -114,66 +123,18 @@ where
     }
 }
 
-impl<F, Tls> Handler<QueryTask<F, Tls>> for PostgresActor<Tls>
+impl<F, Tls, R> Handler<PostgresMessage<F, Tls, R>> for PostgresActor<Tls>
 where
+    R: 'static + Send,
     Tls: MakeTlsConnect<Socket> + Clone + Send + Sync + 'static + Unpin,
     <Tls as MakeTlsConnect<Socket>>::Stream: Send + Sync,
     <Tls as MakeTlsConnect<Socket>>::TlsConnect: Send,
     <<Tls as MakeTlsConnect<Socket>>::TlsConnect as TlsConnect<Socket>>::Future: Send + Unpin,
-    F: FnOnce(Pool<PostgresConnectionManager<Tls>>) -> ResponseFuture<Result<Vec<Row>, Error>> + 'static + Send + Sync,
+    F: FnOnce(Pool<PostgresConnectionManager<Tls>>) -> ResponseFuture<Result<R, Error>> + 'static + Send + Sync,
 {
-    type Result = ResponseFuture<Result<Vec<Row>, Error>>;
+    type Result = ResponseFuture<Result<R, Error>>;
 
-    fn handle(&mut self, msg: QueryTask<F, Tls>, _ctx: &mut Self::Context) -> Self::Result
-    {
-        let pool2 = self.pool.as_ref().unwrap().clone();
-        Box::pin(async move {
-            (msg.query)(pool2).await
-        })
-    }
-}
-
-#[derive(Message)]
-#[rtype(result = "Result<Row, Error>")]
-pub struct QueryOneTask<F,Tls>
-where
-    Tls: MakeTlsConnect<Socket> + Clone + Send + Sync + 'static + Unpin,
-    <Tls as MakeTlsConnect<Socket>>::Stream: Send + Sync,
-    <Tls as MakeTlsConnect<Socket>>::TlsConnect: Send,
-    <<Tls as MakeTlsConnect<Socket>>::TlsConnect as TlsConnect<Socket>>::Future: Send + Unpin,
-    F: FnOnce(Pool<PostgresConnectionManager<Tls>>) -> ResponseFuture<Result<Row, Error>> + 'static,
-{
-    query: F,
-    phantom: PhantomData<Tls>,
-}
-
-impl<F, Tls> QueryOneTask<F, Tls>
-where
-    Tls: MakeTlsConnect<Socket> + Clone + Send + Sync + 'static + Unpin,
-    <Tls as MakeTlsConnect<Socket>>::Stream: Send + Sync,
-    <Tls as MakeTlsConnect<Socket>>::TlsConnect: Send,
-    <<Tls as MakeTlsConnect<Socket>>::TlsConnect as TlsConnect<Socket>>::Future: Send + Unpin,
-    F: FnOnce(Pool<PostgresConnectionManager<Tls>>) -> ResponseFuture<Result<Row, Error>> + 'static + Send + Sync,
-{
-    pub fn new(query: F) -> Self {
-        Self {
-            query: query,
-            phantom: PhantomData,
-        }
-    }
-}
-
-impl<F, Tls> Handler<QueryOneTask<F, Tls>> for PostgresActor<Tls>
-where
-    Tls: MakeTlsConnect<Socket> + Clone + Send + Sync + 'static + Unpin,
-    <Tls as MakeTlsConnect<Socket>>::Stream: Send + Sync,
-    <Tls as MakeTlsConnect<Socket>>::TlsConnect: Send,
-    <<Tls as MakeTlsConnect<Socket>>::TlsConnect as TlsConnect<Socket>>::Future: Send + Unpin,
-    F: FnOnce(Pool<PostgresConnectionManager<Tls>>) -> ResponseFuture<Result<Row, Error>> + 'static + Send + Sync,
-{
-    type Result = ResponseFuture<Result<Row, Error>>;
-
-    fn handle(&mut self, msg: QueryOneTask<F, Tls>, _ctx: &mut Self::Context) -> Self::Result
+    fn handle(&mut self, msg: PostgresMessage<F, Tls, R>, _ctx: &mut Self::Context) -> Self::Result
     {
         let pool2 = self.pool.as_ref().unwrap().clone();
         Box::pin(async move {
