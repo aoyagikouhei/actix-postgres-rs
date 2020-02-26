@@ -132,3 +132,52 @@ where
         })
     }
 }
+
+#[derive(Message)]
+#[rtype(result = "Result<Row, Error>")]
+pub struct QueryOneTask<F,Tls>
+where
+    Tls: MakeTlsConnect<Socket> + Clone + Send + Sync + 'static + Unpin,
+    <Tls as MakeTlsConnect<Socket>>::Stream: Send + Sync,
+    <Tls as MakeTlsConnect<Socket>>::TlsConnect: Send,
+    <<Tls as MakeTlsConnect<Socket>>::TlsConnect as TlsConnect<Socket>>::Future: Send + Unpin,
+    F: FnOnce(Pool<PostgresConnectionManager<Tls>>) -> ResponseFuture<Result<Row, Error>> + 'static,
+{
+    query: F,
+    phantom: PhantomData<Tls>,
+}
+
+impl<F, Tls> QueryOneTask<F, Tls>
+where
+    Tls: MakeTlsConnect<Socket> + Clone + Send + Sync + 'static + Unpin,
+    <Tls as MakeTlsConnect<Socket>>::Stream: Send + Sync,
+    <Tls as MakeTlsConnect<Socket>>::TlsConnect: Send,
+    <<Tls as MakeTlsConnect<Socket>>::TlsConnect as TlsConnect<Socket>>::Future: Send + Unpin,
+    F: FnOnce(Pool<PostgresConnectionManager<Tls>>) -> ResponseFuture<Result<Row, Error>> + 'static + Send + Sync,
+{
+    pub fn new(query: F) -> Self {
+        Self {
+            query: query,
+            phantom: PhantomData,
+        }
+    }
+}
+
+impl<F, Tls> Handler<QueryOneTask<F, Tls>> for PostgresActor<Tls>
+where
+    Tls: MakeTlsConnect<Socket> + Clone + Send + Sync + 'static + Unpin,
+    <Tls as MakeTlsConnect<Socket>>::Stream: Send + Sync,
+    <Tls as MakeTlsConnect<Socket>>::TlsConnect: Send,
+    <<Tls as MakeTlsConnect<Socket>>::TlsConnect as TlsConnect<Socket>>::Future: Send + Unpin,
+    F: FnOnce(Pool<PostgresConnectionManager<Tls>>) -> ResponseFuture<Result<Row, Error>> + 'static + Send + Sync,
+{
+    type Result = ResponseFuture<Result<Row, Error>>;
+
+    fn handle(&mut self, msg: QueryOneTask<F, Tls>, _ctx: &mut Self::Context) -> Self::Result
+    {
+        let pool2 = self.pool.as_ref().unwrap().clone();
+        Box::pin(async move {
+            (msg.query)(pool2).await
+        })
+    }
+}
