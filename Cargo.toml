@@ -3,10 +3,14 @@ name = "actix-postgres"
 version = "0.1.0"
 authors = ["aoyagikouhei <aoyagi.kouhei@gmail.com>"]
 edition = "2018"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+license = "MIT OR Apache-2.0"
+description = "PostgreSQL integration for Actix framework."
+repository = "https://github.com/aoyagikouhei/actix-postgres-rs"
+keywords = ["actix", "postgresql"]
+categories = ["network-programming", "asynchronous"]
+readme = "Readme.md"
+documentation = "https://docs.rs/actix-postgres"
 
 [dependencies]
 actix = "^0.9"
-async-trait = "^0.1"
 bb8-postgres = "^0.4"
