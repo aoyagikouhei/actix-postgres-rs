@@ -158,9 +158,14 @@ where
 /// PostgreSQL Errors
 #[derive(Debug)]
 pub enum PostgresError {
+    /// An error returned from postgres.
     PgError(Error),
+    /// An error returned from bb8.
     BB8Error(RunError<Error>),
+    /// An error returned at pool none.
     PoolNone,
+    /// An error returned from user.
+    Other(String),
 }
 
 impl From<Error> for PostgresError {

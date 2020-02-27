@@ -18,10 +18,11 @@ async fn main() {
     let pg_actor = PostgresActor::start(&path, NoTls).unwrap();
     let task = PostgresMessage::new(|pool| {
         Box::pin(async move {
-            let connection = pool.get().await.unwrap();
+            let connection = pool.get().await?;
             connection
                 .query("SELECT NOW()::TEXT as c", &vec![])
                 .await
+                .map_err(|err| err.into())
         })
     });
     let res = pg_actor.send(task).await.unwrap().unwrap();
