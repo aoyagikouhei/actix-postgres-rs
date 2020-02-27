@@ -5,7 +5,7 @@ PostgreSQL integration for Actix framework.
 [Documentation](https://docs.rs/actix-postgres)
 
 ## Features
-- 
+- Postgresql Connection
 
 ## Examples
 ```rust
