@@ -14,3 +14,4 @@ documentation = "https://docs.rs/actix-postgres"
 [dependencies]
 actix = "^0.9"
 bb8-postgres = "^0.4"
+thiserror = "1"
