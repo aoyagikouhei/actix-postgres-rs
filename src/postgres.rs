@@ -12,6 +12,7 @@ use bb8_postgres::{
 use std::marker::PhantomData;
 use std::marker::Unpin;
 use std::str::FromStr;
+use thiserror::Error;
 
 /// PostgreSQL Actor
 pub struct PostgresActor<Tls>
@@ -156,26 +157,18 @@ where
 }
 
 /// PostgreSQL Errors
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum PostgresError {
     /// An error returned from postgres.
-    PgError(Error),
+    #[error(transparent)]
+    PgError(#[from] Error),
     /// An error returned from bb8.
-    BB8Error(RunError<Error>),
+    #[error(transparent)]
+    BB8Error(#[from] RunError<Error>),
     /// An error returned at pool none.
+    #[error("connection pool not initialized")]
     PoolNone,
     /// An error returned from user.
+    #[error("user error: {0}")]
     Other(String),
-}
-
-impl From<Error> for PostgresError {
-    fn from(err: Error) -> Self {
-        Self::PgError(err)
-    }
-}
-
-impl From<RunError<Error>> for PostgresError {
-    fn from(err: RunError<Error>) -> Self {
-        Self::BB8Error(err)
-    }
 }
