@@ -1,9 +1,10 @@
-use actix::prelude::*;
 use actix_daemon_utils::{
+    actix::{prelude::*, System},
     graceful_stop::GracefulStop,
     looper::{Looper, Task},
 };
 use actix_postgres::{bb8_postgres::tokio_postgres::tls::NoTls, PostgresActor, PostgresMessage};
+use std::time::Duration;
 
 struct MyActor {
     msg: String,
@@ -16,7 +17,7 @@ impl Actor for MyActor {
 }
 
 impl Handler<Task> for MyActor {
-    type Result = u64;
+    type Result = Option<std::time::Duration>;
 
     fn handle(&mut self, _msg: Task, ctx: &mut Self::Context) -> Self::Result {
         println!("{}", self.msg);
@@ -44,7 +45,7 @@ impl Handler<Task> for MyActor {
                 Err(err) => println!("{:?}", err),
             })
             .wait(ctx);
-        self.seconds
+        Some(Duration::from_secs(self.seconds))
     }
 }
 
@@ -59,7 +60,7 @@ impl Actor for MyActor2 {
 }
 
 impl Handler<Task> for MyActor2 {
-    type Result = u64;
+    type Result = Option<std::time::Duration>;
 
     fn handle(&mut self, _msg: Task, ctx: &mut Self::Context) -> Self::Result {
         println!("{}", self.msg);
@@ -87,33 +88,37 @@ impl Handler<Task> for MyActor2 {
                 Err(err) => println!("{:?}", err),
             })
             .wait(ctx);
-        self.seconds
+        Some(Duration::from_secs(self.seconds))
     }
 }
 
 fn main() {
     let path = std::env::var("PG_PATH").unwrap();
-    let sys = actix::System::new("main");
+    let sys = System::new();
     let graceful_stop = GracefulStop::new();
-    let pg_actor = PostgresActor::start(&path, NoTls).unwrap();
-    let actor1 = MyActor {
-        msg: "x".to_string(),
-        seconds: 1,
-        pg: pg_actor.clone(),
-    }
-    .start();
-    let looper1 = Looper::new(actor1.recipient(), graceful_stop.clone_system_terminator()).start();
-    let actor2 = MyActor2 {
-        msg: "y".to_string(),
-        seconds: 1,
-        pg: pg_actor,
-    }
-    .start();
-    let looper2 = Looper::new(actor2.recipient(), graceful_stop.clone_system_terminator()).start();
-    graceful_stop
-        .subscribe(looper1.recipient())
-        .subscribe(looper2.recipient())
+    sys.block_on(async {
+        let pg_actor = PostgresActor::start(&path, NoTls).unwrap();
+        let actor1 = MyActor {
+            msg: "x".to_string(),
+            seconds: 1,
+            pg: pg_actor.clone(),
+        }
         .start();
+        let looper1 =
+            Looper::new(actor1.recipient(), graceful_stop.clone_system_terminator()).start();
+        let actor2 = MyActor2 {
+            msg: "y".to_string(),
+            seconds: 1,
+            pg: pg_actor,
+        }
+        .start();
+        let looper2 =
+            Looper::new(actor2.recipient(), graceful_stop.clone_system_terminator()).start();
+        graceful_stop
+            .subscribe(looper1.recipient())
+            .subscribe(looper2.recipient())
+            .start();
+    });
 
     let _ = sys.run();
     println!("main terminated");

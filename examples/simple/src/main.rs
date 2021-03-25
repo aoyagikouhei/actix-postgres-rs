@@ -1,7 +1,7 @@
 use actix::prelude::*;
 use actix_postgres::{bb8_postgres::tokio_postgres::tls::NoTls, PostgresActor, PostgresMessage};
 
-#[actix_rt::main]
+#[actix::main]
 async fn main() {
     let path = std::env::var("PG_PATH").unwrap();
     let pg_actor = PostgresActor::start(&path, NoTls).unwrap();

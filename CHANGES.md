@@ -1,5 +1,8 @@
 # Changes
 
+## [0.2.0] 2021-03-25
+
+* updated actix 0.11.0
 ## [0.1.1] 2020-07-10
 
 * modify error
