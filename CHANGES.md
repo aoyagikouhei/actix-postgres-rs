@@ -1,5 +1,9 @@
 # Changes
 
+## [0.3.0] 2021-06-25
+
+* updated actix 0.12.0
+
 ## [0.2.0] 2021-03-25
 
 * updated actix 0.11.0
