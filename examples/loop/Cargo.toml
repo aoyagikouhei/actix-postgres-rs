@@ -2,10 +2,10 @@
 name = "sample"
 version = "0.1.0"
 authors = ["aoyagikouhei <aoyagi.kouhei@gmail.com>"]
-edition = "2018"
+edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 actix-postgres = {path="../.."}
-actix-daemon-utils = "~0.5.0"
+actix-daemon-utils = "~0.7.0"

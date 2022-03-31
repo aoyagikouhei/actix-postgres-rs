@@ -1,6 +1,6 @@
 [package]
 name = "actix-postgres"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["aoyagikouhei <aoyagi.kouhei@gmail.com>"]
 edition = "2018"
 license = "MIT OR Apache-2.0"
@@ -12,6 +12,6 @@ readme = "Readme.md"
 documentation = "https://docs.rs/actix-postgres"
 
 [dependencies]
-actix = "~0.11.0"
-bb8-postgres = "~0.7.0"
-thiserror = "~1.0.24"
+actix = "~0.13.0"
+bb8-postgres = "~0.8.0"
+thiserror = "~1.0.30"
