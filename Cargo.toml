@@ -2,7 +2,7 @@
 name = "actix-postgres"
 version = "0.3.0"
 authors = ["aoyagikouhei <aoyagi.kouhei@gmail.com>"]
-edition = "2018"
+edition = "2021"
 license = "MIT OR Apache-2.0"
 description = "PostgreSQL integration for Actix framework."
 repository = "https://github.com/aoyagikouhei/actix-postgres-rs"
