@@ -12,6 +12,12 @@ readme = "Readme.md"
 documentation = "https://docs.rs/actix-postgres"
 
 [dependencies]
+<<<<<<< HEAD
 actix = "~0.13.0"
 bb8-postgres = "~0.8.0"
 thiserror = "~1.0.30"
+=======
+actix = "~0.12.0"
+bb8-postgres = "~0.7.0"
+thiserror = "~1.0.25"
+>>>>>>> fa8d7558f1f3b0df61e5a74687c4113e14a8847a
